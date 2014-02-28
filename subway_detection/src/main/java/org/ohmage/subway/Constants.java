@@ -1,4 +1,4 @@
-package org.ohmage.subway_detection;
+package org.ohmage.subway;
 
 import org.joda.time.DateTime;
 
@@ -9,8 +9,9 @@ public class Constants {
 	// how many seconds' data before the subway events to be used as features
 	final public static int LOOKBACK_TIME = 600;
 	// the magic strength that represents no signal
-	final public static double NO_SIGNAL_STRENGTH = -200;
+	final public static double NO_SIGNAL_STRENGTH = -1000;
 	
 	final public static int SEED = 1000;
-		
+	final public static int TIME_SLICES_IN_A_DAY = 4;
+	final public static int CV_FOLDS = 2;
 }

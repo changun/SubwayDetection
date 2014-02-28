@@ -1,14 +1,18 @@
-package org.ohmage.subway_detection;
+package org.ohmage.subway;
 
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.joda.time.DateTime;
+import org.joda.time.LocalDate;
 import org.ohmage.models.OhmageStream;
 import org.ohmage.models.OhmageUser;
 import org.ohmage.models.OhmageUser.OhmageAuthenticationError;
@@ -16,7 +20,14 @@ import org.ohmage.sdk.OhmageStreamClient;
 import org.ohmage.sdk.OhmageStreamIterator;
 import org.ohmage.sdk.OhmageStreamIterator.SortOrder;
 
+import weka.classifiers.Classifier;
+import weka.core.Attribute;
+import weka.core.DenseInstance;
+import weka.core.Instance;
+
+import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
+import com.esotericsoftware.kryo.io.Output;
 import com.fasterxml.jackson.databind.JsonNode;
 
 public class Utils {
@@ -89,7 +100,66 @@ public class Utils {
 	    	if(prev != null){
 	    		prev.setNext(data.get(i));
 	    	}
+	    	prev = data.get(i);
 	    }
 	    return data;
 	}
+	static public List<DataPoint> getDataForDate(List<DataPoint> data, LocalDate date) throws OhmageAuthenticationError, IOException{
+		List<DataPoint> ret = new ArrayList<DataPoint>();
+		for(DataPoint dp: data){
+			if(dp.getTime().toLocalDate().isBefore(date)){
+				continue;
+			}
+			else if(dp.getTime().toLocalDate().isAfter(date)){
+				break;
+			}
+			ret.add(dp);
+		}
+		return ret; 
+	}
+	static public List<DataPoint> getDataBefore(List<DataPoint> data, DateTime date) throws OhmageAuthenticationError, IOException{
+		List<DataPoint> ret = new ArrayList<DataPoint>();
+		for(DataPoint dp: data){
+			if(dp.getTime().isBefore(date)){
+				ret.add(dp);
+			}
+			else if(dp.getTime().isAfter(date)){
+				break;
+			}
+		}
+		return ret; 
+	}
+	static public void OutputWiFiSetAndClassifier(Set<String> wifis, Classifier c, ArrayList<Attribute> attrs) throws FileNotFoundException{
+		Kryo kryo = ExportData.getInstance();
+	 	Output output = new Output(new FileOutputStream("classifier.bin"));
+	 	kryo.writeObject(output, c);
+	 	output.close();
+	 	 kryo = ExportData.getInstance();
+	 	 output = new Output(new FileOutputStream("wifis.bin"));
+	 	kryo.writeObject(output, wifis);
+	 	output.close();
+	 	kryo = ExportData.getInstance();
+	 	 output = new Output(new FileOutputStream("attrs.bin"));
+	 	kryo.writeObject(output, attrs);
+	 	output.close();
+	}
+	
+	static public Instance createInstance(DataPoint dp, Boolean subway, ArrayList<Attribute> attrs, Set<String> wifis){
+		// Create the instance
+		 Instance instance = new DenseInstance(attrs.size());
+		 instance.setValue(attrs.get(0), subway? "true": "false");
+		 instance.setValue(attrs.get(1), FeatureExtraction.isWeekday(dp)? "weekday": "weekend");
+		 instance.setValue(attrs.get(2), FeatureExtraction.getTimeslice(dp));
+		 int i = 3;
+		 Map<String, Double> strength_fatures = FeatureExtraction.getWiFiStrengthFeatures(dp, wifis);
+		 for(String wifi: wifis){
+			 instance.setValue(attrs.get(i++), strength_fatures.get(wifi));
+		 }
+		 Map<String, Double> strength_delta_fatures = FeatureExtraction.getWiFiStrengthDifferenceFeatures(dp, wifis);
+		 for(String wifi: wifis){
+			 instance.setValue(attrs.get(i++), strength_delta_fatures.get(wifi));
+		 }
+		 return instance;
+	}
+	
 }

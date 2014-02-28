@@ -1,4 +1,4 @@
-package org.ohmage.subway_detection;
+package org.ohmage.subway;
 
 
 public enum MobilityState {

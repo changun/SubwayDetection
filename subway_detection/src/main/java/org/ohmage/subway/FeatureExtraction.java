@@ -1,5 +1,6 @@
-package org.ohmage.subway_detection;
+package org.ohmage.subway;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,8 +11,8 @@ import java.util.Set;
 import java.util.TreeMap;
 
 public class FeatureExtraction {
-	static public Set<DataPoint> getAllActivePoints(List<DataPoint> data){
-		Set<DataPoint> ret = new HashSet<DataPoint>();
+	static public List<DataPoint> getAllActivePoints(List<DataPoint> data){
+		List<DataPoint> ret = new ArrayList<DataPoint>();
 		for(DataPoint dp: data){
 			if(dp.getMode().isActive()){
 				ret.add(dp);
@@ -19,8 +20,8 @@ public class FeatureExtraction {
 		}
 		return ret;
 	}
-	static public Set<DataPoint> getActivePointsBeforeSubway(List<DataPoint> data){
-		Set<DataPoint> ret = new HashSet<DataPoint>();
+	static public List<DataPoint> getActivePointsBeforeSubway(List<DataPoint> data){
+		List<DataPoint> ret = new ArrayList<DataPoint>();
 		for(DataPoint dp: data){
 			if(dp.prev != null && !dp.prev.isSubwayEvent() && dp.isSubwayEvent()){
 				// we found the beginning of a subway event
@@ -35,7 +36,7 @@ public class FeatureExtraction {
 		return ret;
 	}
 	
-	static public Set<String> getStrongestNWiFiInAllPoints(Set<DataPoint> data, int n){
+	static public Set<String> getStrongestNWiFiInAllPoints(List<DataPoint> data, int n){
 		Set<String> ret = new HashSet<String>();
 		for(DataPoint point : data){
 		        ValueComparator bvc =  new ValueComparator(point.getWifis());
@@ -43,7 +44,8 @@ public class FeatureExtraction {
 		        sorted_map.putAll(point.getWifis());
 		        int i = 0;
 		        for(String wifi: sorted_map.keySet()){
-		        	
+		        	//if(wifi.equals("00:00:00:00:00:00"))
+		        	//	continue;
 		        	if(i<n){
 		        		ret.add(wifi);
 		        		i++;
@@ -55,19 +57,21 @@ public class FeatureExtraction {
 		}
 		return ret;
 	}
-	static public Map<String, Double> getWiFiSignalFeatures(DataPoint data, Set<String> wifis){
+	static public Map<String, Double> getWiFiStrengthFeatures(DataPoint data, Set<String> wifis){
 		Map<String, Double> ret = new HashMap<String, Double>();
 		for(String wifi: wifis){
 			if(data.getWifis().containsKey(wifi)){
-				ret.put(wifi, data.getWifis().get(wifi));
+				ret.put(wifi, 1.0);
+				//ret.put(wifi, data.getWifis().get(wifi));
 			}
 			else{
-				ret.put(wifi, Constants.NO_SIGNAL_STRENGTH);
+				ret.put(wifi, 0.0);
+				//ret.put(wifi, Constants.NO_SIGNAL_STRENGTH);
 			}
 		}
 		return ret;
 	}
-	static public Map<String, Double> getWiFiSignalDifferenceFeatures(DataPoint data, Set<String> wifis){
+	static public Map<String, Double> getWiFiStrengthDifferenceFeatures(DataPoint data, Set<String> wifis){
 		Map<String, Double> ret = new HashMap<String, Double>();
 		for(String wifi: wifis){
 			double prevStrength = Constants.NO_SIGNAL_STRENGTH;
@@ -78,12 +82,15 @@ public class FeatureExtraction {
 			if(data.getPrev().getWifis().containsKey(wifi)){
 				prevStrength = data.getPrev().getWifis().get(wifi);
 			}
-			ret.put(wifi, curStrength-prevStrength );
+			int change = curStrength-prevStrength > 0  ? 1 : -1;
+			if(curStrength-prevStrength == 0)
+				change= 0 ;
+			ret.put(wifi, (double) change  );
 		}
 		return ret;
 	}
-	static public String getHour(DataPoint data){
-		return data.getTime().hourOfDay().getAsShortText();
+	static public String getTimeslice(DataPoint data){
+		return ((Integer)(data.getTime().hourOfDay().get() / (24 / Constants.TIME_SLICES_IN_A_DAY))).toString();
 	}
 	static public Boolean isWeekday(DataPoint data){
 		return data.getTime().dayOfWeek().get() < 6;
