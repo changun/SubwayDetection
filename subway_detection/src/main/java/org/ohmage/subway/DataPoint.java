@@ -2,15 +2,20 @@ package org.ohmage.subway;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
+import java.util.Stack;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.joda.time.DateTime;
 import org.ohmage.models.OhmageUser;
 
 public class DataPoint {
-	Map<String, Double> wifis = new HashMap<String, Double>();
+
+	Map<WiFi, Double> wifis = new HashMap<WiFi, Double>();
+	
 	MobilityState mode;
 	DateTime time;
 	OhmageUser user;
@@ -30,10 +35,10 @@ public class DataPoint {
 	public void setLng(Double lng) {
 		this.lng = lng;
 	}
-	public Map<String, Double> getWifis() {
+	public Map<WiFi, Double> getWifis() {
 		return wifis;
 	}
-	public void setWifis(Map<String, Double> wifis) {
+	public void setWifis(Map<WiFi, Double> wifis) {
 		this.wifis = wifis;
 	}
 	public MobilityState getMode() {
@@ -69,12 +74,12 @@ public class DataPoint {
 	private Boolean isSubwayEvent = null;
 	public boolean isSubwayEvent(){
 		if(isSubwayEvent == null){
-			isSubwayEvent= (this.getMeanWifiAPNumberInNextNSeconds(Constants.LOOKAHEAD_TIME) < 1.0);
+			double avgAvailalbeWifi = this.getMeanWifiAPNumberInNextNSeconds(Constants.LOOKAHEAD_TIME);
+			isSubwayEvent= ( avgAvailalbeWifi < Constants.MINIMUN_AVAILABLE_WIFI_FOR_NON_SUBWAY);
 		}
 		return isSubwayEvent;
 	}
-	
-	// get the points within the next N seconds (include itsself)
+	// get the points within the next N seconds (include itself)
 	public List<DataPoint> getPointsInNextNSeconds(int n){
 		List<DataPoint> points = new ArrayList<DataPoint>();
 		DataPoint pointer = this;
@@ -87,35 +92,35 @@ public class DataPoint {
 			else{
 				break;
 			}
-			
 		}
 		return points;
 	}
-	// get the points within the next N seconds (include itsself)
+	// return the first subway even in the next N seconds
+	public DataPoint getSubwayEventInNextNSeconds(int n){
+		for(DataPoint dp: getPointsInNextNSeconds(n)){
+			if(dp.isSubwayEvent())
+				return dp;
+		}
+		return null;
+	}
+	// get the points within the previous  N seconds (not include itself)
 	public List<DataPoint> getPointsInPrevNSeconds(int n){
-		List<DataPoint> points = new ArrayList<DataPoint>();
+		// use stack to store points to output the points in a reversed order
+		Stack<DataPoint> stack = new Stack<DataPoint>();
 		DataPoint pointer = this;
-		points.add(pointer);
 		while(pointer.prev != null){
 			pointer = pointer.prev;
 			if(pointer.time.plusSeconds(n).isAfter(this.getTime())){
-				points.add(pointer);
+				stack.push(pointer);
 			}
 			else{
 				break;
 			}
 			
 		}
-		List<DataPoint> reverse = new ArrayList<DataPoint>();
-		for(DataPoint point: points){
-			reverse.add(null);
-		}
-		int i = points.size();
-		for(DataPoint point: points){
-			reverse.set(--i, point);
-		}
-		return (reverse);
+		return (new ArrayList<DataPoint>(stack));
 	}
+	// get the average of the availalbe WiFi APs in the next N seconds
 	public double getMeanWifiAPNumberInNextNSeconds(int n){
 		List<DataPoint> points = this.getPointsInNextNSeconds(n);
 		double totalApNumber = 0;

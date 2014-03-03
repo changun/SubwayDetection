@@ -19,11 +19,13 @@ import org.ohmage.models.OhmageUser.OhmageAuthenticationError;
 import org.ohmage.sdk.OhmageStreamClient;
 import org.ohmage.sdk.OhmageStreamIterator;
 import org.ohmage.sdk.OhmageStreamIterator.SortOrder;
+import org.ohmage.subway.WiFi;
 
 import weka.classifiers.Classifier;
 import weka.core.Attribute;
 import weka.core.DenseInstance;
 import weka.core.Instance;
+import weka.core.Instances;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
@@ -52,7 +54,7 @@ public class Utils {
 	        OhmageStreamIterator streamIterator = client.getOhmageStreamIteratorBuilder(stream, user)
 	            .order(SortOrder.Chronological)
 	            .startDate(pointer)
-	            .endDate(pointer.plusDays(1)) // order is optional, it is in Chronological order by default
+	            .endDate(pointer.plusDays(1)).columnList("wifi_data,mode") // order is optional, it is in Chronological order by default
 	            .build(); 
 	        pointer = pointer.plusDays(1);
 	        System.out.println("Download data " + pointer.toLocalDate().toString() + " for " + user);
@@ -66,7 +68,7 @@ public class Utils {
 	            	Iterator<JsonNode> iter = dataNode.get("wifi_data").get("scan").iterator();
 	            	while(iter.hasNext()){
 	            		JsonNode scan = iter.next();
-	            		dp.getWifis().put(scan.get("ssid").asText(), scan.get("strength").asDouble());
+	            		dp.getWifis().put(new WiFi(scan.get("ssid").asText()), scan.get("strength").asDouble());
 	            	}
 	            }
 	            else{
@@ -104,62 +106,17 @@ public class Utils {
 	    }
 	    return data;
 	}
-	static public List<DataPoint> getDataForDate(List<DataPoint> data, LocalDate date) throws OhmageAuthenticationError, IOException{
-		List<DataPoint> ret = new ArrayList<DataPoint>();
-		for(DataPoint dp: data){
-			if(dp.getTime().toLocalDate().isBefore(date)){
-				continue;
-			}
-			else if(dp.getTime().toLocalDate().isAfter(date)){
-				break;
-			}
-			ret.add(dp);
+	static public List<LabeledDataPoint> getLabelDataForRawData(List<DataPoint> rawData){
+		List<DataPoint> activePointsBeforeSubway = FeatureExtraction.getActivePointsBeforeSubway(rawData);
+		List<DataPoint> activePoints = FeatureExtraction.getAllActivePoints(rawData);
+		List<LabeledDataPoint> labeledData = new ArrayList<LabeledDataPoint>(activePoints.size());
+		for(DataPoint dp: activePoints){
+			labeledData.add(new LabeledDataPoint(dp, activePointsBeforeSubway.contains(dp)));
 		}
-		return ret; 
-	}
-	static public List<DataPoint> getDataBefore(List<DataPoint> data, DateTime date) throws OhmageAuthenticationError, IOException{
-		List<DataPoint> ret = new ArrayList<DataPoint>();
-		for(DataPoint dp: data){
-			if(dp.getTime().isBefore(date)){
-				ret.add(dp);
-			}
-			else if(dp.getTime().isAfter(date)){
-				break;
-			}
-		}
-		return ret; 
-	}
-	static public void OutputWiFiSetAndClassifier(Set<String> wifis, Classifier c, ArrayList<Attribute> attrs) throws FileNotFoundException{
-		Kryo kryo = ExportData.getInstance();
-	 	Output output = new Output(new FileOutputStream("classifier.bin"));
-	 	kryo.writeObject(output, c);
-	 	output.close();
-	 	 kryo = ExportData.getInstance();
-	 	 output = new Output(new FileOutputStream("wifis.bin"));
-	 	kryo.writeObject(output, wifis);
-	 	output.close();
-	 	kryo = ExportData.getInstance();
-	 	 output = new Output(new FileOutputStream("attrs.bin"));
-	 	kryo.writeObject(output, attrs);
-	 	output.close();
+		return labeledData;
+		
 	}
 	
-	static public Instance createInstance(DataPoint dp, Boolean subway, ArrayList<Attribute> attrs, Set<String> wifis){
-		// Create the instance
-		 Instance instance = new DenseInstance(attrs.size());
-		 instance.setValue(attrs.get(0), subway? "true": "false");
-		 instance.setValue(attrs.get(1), FeatureExtraction.isWeekday(dp)? "weekday": "weekend");
-		 instance.setValue(attrs.get(2), FeatureExtraction.getTimeslice(dp));
-		 int i = 3;
-		 Map<String, Double> strength_fatures = FeatureExtraction.getWiFiStrengthFeatures(dp, wifis);
-		 for(String wifi: wifis){
-			 instance.setValue(attrs.get(i++), strength_fatures.get(wifi));
-		 }
-		 Map<String, Double> strength_delta_fatures = FeatureExtraction.getWiFiStrengthDifferenceFeatures(dp, wifis);
-		 for(String wifi: wifis){
-			 instance.setValue(attrs.get(i++), strength_delta_fatures.get(wifi));
-		 }
-		 return instance;
-	}
+
 	
 }

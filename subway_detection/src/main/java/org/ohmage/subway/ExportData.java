@@ -16,10 +16,12 @@ import java.util.regex.Pattern;
 
 
 
+
 import org.joda.time.DateTime;
 import org.ohmage.models.OhmageServer;
 import org.ohmage.models.OhmageUser;
 import org.ohmage.models.OhmageUser.OhmageAuthenticationError;
+import org.ohmage.subway.WiFi;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Output;
@@ -74,16 +76,18 @@ public class ExportData
 		kryo.register(LinkedList.class);
 		kryo.register(HashMap.class);
 		kryo.register(HashSet.class);
-		
+		kryo.register(MobilityState.class);
+		kryo.setRegistrationRequired(true);
 		
 		
 		kryo.register(OhmageUser.class);
 		kryo.register(OhmageServer.class);
-		
+		kryo.register(WiFi.class);
 		kryo.register(DataPoint.class);
 
 		return kryo;
 	}
+
     public static void main( String[] args ) throws OhmageAuthenticationError, IOException
     {	
     	for(String user: new String[]{"ohmage.cameron", "ohmage.josh", "ohmage.estrin", "sink.thaw" }){
